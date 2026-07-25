@@ -316,6 +316,7 @@ async function loadAppData() {
     if (APP.userRole && APP.userRole.accessMode === 'admin') {
       promises.push(fetchUserRoles().then(() => renderUserRoles()));
       promises.push(fetchDriveSettings().then(() => initGoogleClient()));
+      promises.push(syncMissingRotaractors(true));
     }
 
     await Promise.all(promises);
@@ -626,6 +627,82 @@ async function saveMember() {
     showToast('Failed to save member. Please try again.', 'error');
   }
 }
+
+// Sync / Add missing participants from Attendance Report to "Rotaractors" section
+async function syncMissingRotaractors(silent = false) {
+  const reportNames = [
+    "SHARVESH L",
+    "PRAVEENRAJ K",
+    "SAIKUMAR S",
+    "KUMARESAN KRISHNA",
+    "SUBASRI S",
+    "YASIKA ",
+    "SATHYA",
+    "SHAHIN",
+    "MONISH ADHITHYA"
+  ];
+
+  const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const existingNorms = new Set((APP.members || []).map(m => normalize(m.name)));
+
+  const missingNames = reportNames.filter(name => {
+    const norm = normalize(name);
+    if (!norm) return false;
+    return !Array.from(existingNorms).some(existNorm => {
+      if (existNorm === norm) return true;
+      if (norm.length > 5 && existNorm.length > 5) {
+        if (norm.includes(existNorm) || existNorm.includes(norm)) return true;
+      }
+      return false;
+    });
+  });
+
+  if (missingNames.length === 0) {
+    if (!silent) showToast('All report names already exist in the database.', 'info');
+    return;
+  }
+
+  let addedCount = 0;
+
+  try {
+    const batch = db.batch ? db.batch() : null;
+    for (const name of missingNames) {
+      const docRef = db.collection('members').doc();
+      const memberData = {
+        name: name,
+        category: 'Other Rotaractor',
+        role: '',
+        department: '',
+        year: '',
+        phone: '',
+        email: '',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      if (batch) {
+        batch.set(docRef, memberData);
+      } else {
+        await db.collection('members').add(memberData);
+      }
+      addedCount++;
+    }
+
+    if (batch) {
+      await batch.commit();
+    }
+
+    showToast(`Added ${addedCount} missing member(s) to Rotaractors section!`, 'success');
+    await fetchMembers();
+    renderMembersList();
+    renderAttendanceLists();
+    renderDashboard();
+    updateSettingsCounts();
+  } catch (err) {
+    console.error('Error syncing missing rotaractors:', err);
+    if (!silent) showToast('Failed to sync members. Please check admin permissions.', 'error');
+  }
+}
+
 
 function deleteMember(memberId) {
   const member = APP.members.find(m => m.id === memberId);
