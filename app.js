@@ -1619,6 +1619,9 @@ function renderReportsList() {
           ${s.uploadStatus === 'Synced' && s.fileUrl ? `
             <a class="btn-icon" href="${s.fileUrl}" target="_blank" title="View in Google Drive" style="color:var(--success); display:inline-flex; align-items:center; justify-content:center;"><i class="fab fa-google-drive"></i></a>
           ` : ''}
+          ${APP.userRole && APP.userRole.accessMode === 'admin' && s.uploadStatus === 'Synced' ? `
+            <button class="btn-icon" onclick="uploadSessionPDFToDrive('${s.id}')" title="Re-upload to Google Drive" style="color:var(--accent);"><i class="fas fa-sync-alt"></i></button>
+          ` : ''}
           ${APP.userRole && APP.userRole.accessMode === 'admin' && s.uploadStatus !== 'Synced' ? `
             <button class="btn-icon" onclick="uploadSessionPDFToDrive('${s.id}')" title="Upload to Google Drive" style="color:var(--primary);"><i class="fas fa-cloud-upload-alt"></i></button>
           ` : ''}
