@@ -3090,8 +3090,23 @@ async function getOrCreateDriveFolder() {
     const folderName = APP.driveSettings.driveFolderName || 'Rotaract_Attendance';
     const savedFolderId = APP.driveSettings.driveFolderId || '';
 
-    // Search for existing folder by name first to ensure we use the correct root
-    const query = `name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+    // Validate saved folder ID first (fastest path — no name ambiguity)
+    if (savedFolderId) {
+      const testUrl = `https://www.googleapis.com/drive/v3/files/${savedFolderId}?fields=id,name,trashed`;
+      const testRes = await fetch(testUrl, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      if (testRes.ok) {
+        const fileInfo = await testRes.json();
+        if (!fileInfo.trashed) {
+          return savedFolderId;
+        }
+      }
+    }
+
+    // Search for existing root folder by name — scoped to Drive root only
+    // Using 'root' in parents prevents matching nested folders with the same name
+    const query = `name = '${folderName}' and 'root' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
     const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`;
 
     const searchRes = await fetch(searchUrl, {
@@ -3113,25 +3128,12 @@ async function getOrCreateDriveFolder() {
       }
     }
 
-    if (savedFolderId) {
-      // Validate saved folder ID
-      const testUrl = `https://www.googleapis.com/drive/v3/files/${savedFolderId}?fields=id,name,trashed`;
-      const testRes = await fetch(testUrl, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
-      if (testRes.ok) {
-        const fileInfo = await testRes.json();
-        if (!fileInfo.trashed) {
-          return savedFolderId;
-        }
-      }
-    }
-
-    // Create new folder
+    // Create new folder explicitly in Drive root
     const createUrl = `https://www.googleapis.com/drive/v3/files`;
     const folderMetadata = {
       name: folderName,
-      mimeType: 'application/vnd.google-apps.folder'
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: ['root']
     };
 
     const createRes = await fetch(createUrl, {
@@ -3160,63 +3162,66 @@ async function getOrCreateDriveFolder() {
   }
 }
 
+// Concurrency lock to prevent parallel createYearMonthFolders calls from creating duplicates
+let _yearMonthFolderLock = Promise.resolve();
+
 async function createYearMonthFolders(parentFolderId, dateStr) {
+  // Serialise all Year/Month folder operations through a single queue
+  // This prevents two parallel uploads from both seeing "July doesn't exist" and both creating it
+  const result = _yearMonthFolderLock = _yearMonthFolderLock
+    .catch(() => {}) // Don't let a previous failure block the queue
+    .then(() => _createYearMonthFoldersImpl(parentFolderId, dateStr));
+  return result;
+}
+
+async function _createYearMonthFoldersImpl(parentFolderId, dateStr) {
   try {
     const accessToken = await ensureValidAccessToken();
     const dateObj = dateStr ? new Date(dateStr + 'T00:00:00') : new Date();
     const year = String(dateObj.getFullYear());
     const month = dateObj.toLocaleString('en', { month: 'long' }); // e.g. July
 
-    // 1. Get/Create Year Folder
-    let query = `name = '${year}' and '${parentFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-    let searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`;
-    let res = await fetch(searchUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-    let data = await res.json();
-
-    let yearFolderId;
-    if (data.files && data.files.length > 0) {
-      yearFolderId = data.files[0].id;
-    } else {
-      const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: year,
-          mimeType: 'application/vnd.google-apps.folder',
-          parents: [parentFolderId]
-        })
-      });
-      const folder = await createRes.json();
-      yearFolderId = folder.id;
+    // Helper: search for an existing child folder by name inside a specific parent
+    async function findChildFolder(parentId, childName) {
+      const query = `name = '${childName}' and '${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`;
+      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return (data.files && data.files.length > 0) ? data.files[0].id : null;
     }
 
-    // 2. Get/Create Month Folder
-    query = `name = '${month}' and '${yearFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-    searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`;
-    res = await fetch(searchUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-    data = await res.json();
-
-    let monthFolderId;
-    if (data.files && data.files.length > 0) {
-      monthFolderId = data.files[0].id;
-    } else {
-      const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+    // Helper: create a child folder inside a specific parent
+    async function createChildFolder(parentId, childName) {
+      const res = await fetch('https://www.googleapis.com/drive/v3/files', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          name: month,
+          name: childName,
           mimeType: 'application/vnd.google-apps.folder',
-          parents: [yearFolderId]
+          parents: [parentId]
         })
       });
-      const folder = await createRes.json();
-      monthFolderId = folder.id;
+      if (!res.ok) throw new Error(`Failed to create folder "${childName}"`);
+      const folder = await res.json();
+      return folder.id;
+    }
+
+    // 1. Get or Create Year Folder (e.g. "2026" inside Rotaract_Attendance)
+    let yearFolderId = await findChildFolder(parentFolderId, year);
+    if (!yearFolderId) {
+      yearFolderId = await createChildFolder(parentFolderId, year);
+      console.log(`Created year folder: ${year} (${yearFolderId})`);
+    }
+
+    // 2. Get or Create Month Folder (e.g. "July" inside 2026)
+    let monthFolderId = await findChildFolder(yearFolderId, month);
+    if (!monthFolderId) {
+      monthFolderId = await createChildFolder(yearFolderId, month);
+      console.log(`Created month folder: ${month} (${monthFolderId})`);
     }
 
     return monthFolderId;
@@ -3440,6 +3445,29 @@ async function cleanUpIncorrectDriveFolders(rootFolderId, accessToken) {
       });
     };
 
+    // Move files from a source folder to a destination folder before trashing the source
+    const rescueFilesFromFolder = async (sourceFolderId, destFolderId) => {
+      const filesRes = await fetch(listUrl(sourceFolderId), { headers: { 'Authorization': `Bearer ${accessToken}` } });
+      if (!filesRes.ok) return;
+      const filesData = await filesRes.json();
+      const files = filesData.files || [];
+      for (const file of files) {
+        if (file.mimeType !== 'application/vnd.google-apps.folder') {
+          // Move PDF file: remove old parent, add correct parent
+          await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?addParents=${destFolderId}&removeParents=${sourceFolderId}`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+          });
+          console.log(`Rescued file "${file.name}" from duplicate folder to correct location.`);
+        }
+      }
+    };
+
+    const validMonths = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+
     // 1. Get all items in the root Rotaract_Attendance folder
     let res = await fetch(listUrl(rootFolderId), { headers: { 'Authorization': `Bearer ${accessToken}` } });
     if (!res.ok) return;
@@ -3450,37 +3478,32 @@ async function cleanUpIncorrectDriveFolders(rootFolderId, accessToken) {
       if (item.mimeType === 'application/vnd.google-apps.folder') {
         const isYear = /^\d{4}$/.test(item.name);
         if (!isYear) {
-          // Delete folder if not a 4-digit year (e.g. invalid subfolders)
           console.log(`Trashing invalid folder in root: ${item.name}`);
           await trashFile(item.id);
         } else {
-          // Check inside the valid year folder
+          // Check inside the valid year folder for invalid items
           let yearRes = await fetch(listUrl(item.id), { headers: { 'Authorization': `Bearer ${accessToken}` } });
           if (yearRes.ok) {
             let yearData = await yearRes.json();
             const yearItems = yearData.files || [];
 
-            const validMonths = [
-              'January', 'February', 'March', 'April', 'May', 'June',
-              'July', 'August', 'September', 'October', 'November', 'December'
-            ];
-
             for (const yearItem of yearItems) {
               if (yearItem.mimeType === 'application/vnd.google-apps.folder') {
                 const isMonth = validMonths.includes(yearItem.name);
                 if (!isMonth) {
-                  // Not a month folder, delete it
-                  console.log(`Trashing invalid folder inside Year: ${yearItem.name}`);
+                  console.log(`Trashing invalid folder inside Year ${item.name}: ${yearItem.name}`);
                   await trashFile(yearItem.id);
                 } else {
-                  // Inside valid month folder (e.g. July) -> delete any subfolders (e.g. duplicate "2026")
+                  // Inside valid month folder — trash any rogue subfolders (e.g. duplicate "2026" inside "July")
                   let monthRes = await fetch(listUrl(yearItem.id), { headers: { 'Authorization': `Bearer ${accessToken}` } });
                   if (monthRes.ok) {
                     let monthData = await monthRes.json();
                     const monthItems = monthData.files || [];
                     for (const monthItem of monthItems) {
                       if (monthItem.mimeType === 'application/vnd.google-apps.folder') {
-                        console.log(`Trashing nested folder inside Month: ${monthItem.name}`);
+                        console.log(`Trashing nested duplicate folder "${monthItem.name}" inside ${item.name}/${yearItem.name}`);
+                        // Rescue any PDFs trapped inside the rogue subfolder first
+                        await rescueFilesFromFolder(monthItem.id, yearItem.id);
                         await trashFile(monthItem.id);
                       }
                     }
@@ -3492,6 +3515,8 @@ async function cleanUpIncorrectDriveFolders(rootFolderId, accessToken) {
         }
       }
     }
+
+    console.log('Drive folder cleanup completed successfully.');
   } catch (err) {
     console.error('Error cleaning up Drive folders:', err);
   }
