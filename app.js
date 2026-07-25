@@ -2136,7 +2136,7 @@ function exportSessionPDF(sessionId, download = true) {
           const watermarkSize = 110;
           const wx = (pageW - watermarkSize) / 2;
           const wy = (pageH - watermarkSize) / 2 + 10;
-          const gState = doc.GState({ opacity: 0.16 });
+          const gState = new (doc.GState || (window.jspdf && window.jspdf.GState))({ opacity: 0.16 });
           doc.saveGraphicsState();
           doc.setGState(gState);
           doc.addImage(bgLogo, 'PNG', wx, wy, watermarkSize, watermarkSize);
@@ -2968,6 +2968,12 @@ function initGoogleClient() {
     return;
   }
 
+  if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+    console.warn('Google Identity Services library not yet loaded. Retrying in 500ms...');
+    setTimeout(initGoogleClient, 500);
+    return;
+  }
+
   try {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: clientId,
@@ -3224,6 +3230,10 @@ async function createYearMonthFolders(parentFolderId, dateStr) {
 function loadGooglePicker() {
   if (!APP.googleAccessToken) {
     connectGoogleDrive();
+    return;
+  }
+  if (!window.gapi || !window.gapi.load) {
+    showToast('Google API library is loading. Please try again in a moment.', 'warning');
     return;
   }
   gapi.load('client:picker', {
