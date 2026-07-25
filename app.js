@@ -3318,16 +3318,58 @@ async function uploadSessionPDFToDrive(sessionId) {
     const safeName = (session.eventName || 'Report').replace(/[^a-zA-Z0-9]/g, '_');
     const filename = `${safeName}_${session.date || 'undated'}.pdf`;
 
-    // Execute Multipart File Upload (use existing fileId if available)
+    // Determine if existing fileId is still valid and usable
+    let useFileId = session.fileId || null;
+    if (useFileId) {
+      try {
+        const checkRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${useFileId}?fields=id,trashed,parents`,
+          { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+        if (checkRes.ok) {
+          const fileInfo = await checkRes.json();
+          if (fileInfo.trashed) {
+            console.warn(`Old file ${useFileId} is in trash. Will create a new file.`);
+            useFileId = null;
+          }
+        } else {
+          console.warn(`Old file ${useFileId} no longer accessible (${checkRes.status}). Will create a new file.`);
+          useFileId = null;
+        }
+      } catch (e) {
+        console.warn('Error verifying existing file, will create new:', e);
+        useFileId = null;
+      }
+    }
+
+    // Execute Multipart File Upload
     let uploadResult;
     try {
-      uploadResult = await sendPDFToGoogleDrive(blob, filename, targetFolderId, session.fileId);
+      uploadResult = await sendPDFToGoogleDrive(blob, filename, targetFolderId, useFileId);
     } catch (err) {
-      if (session.fileId && (err.message.includes('404') || err.message.includes('not found') || err.message.includes('403') || err.message.includes('Upload Failed (404)') || err.message.includes('Upload Failed (403)'))) {
+      if (useFileId && (err.message.includes('404') || err.message.includes('not found') || err.message.includes('403'))) {
         console.warn('Existing file not found or inaccessible in Drive. Creating a new one...');
         uploadResult = await sendPDFToGoogleDrive(blob, filename, targetFolderId, null);
       } else {
         throw err;
+      }
+    }
+
+    // If we PATCHed an existing file, move it to the correct target folder
+    if (useFileId && uploadResult.id === useFileId) {
+      try {
+        const moveRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${useFileId}?addParents=${targetFolderId}&removeParents=${(session.driveFolderId && session.driveFolderId !== targetFolderId) ? session.driveFolderId : ''}&fields=id,parents`,
+          {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+          }
+        );
+        if (moveRes.ok) {
+          console.log(`File moved to correct folder: ${targetFolderId}`);
+        }
+      } catch (e) {
+        console.warn('Could not move file to correct folder:', e);
       }
     }
 
