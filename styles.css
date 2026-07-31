@@ -3183,3 +3183,14 @@ tbody tr:last-child td {
     cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><defs><linearGradient id='gb' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%23FFEFA6'/><stop offset='50%25' stop-color='%23F4D03F'/><stop offset='100%25' stop-color='%23D4AF37'/></linearGradient><linearGradient id='gd' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%23D4AF37'/><stop offset='70%25' stop-color='%23B8860B'/><stop offset='100%25' stop-color='%238A6405'/></linearGradient><filter id='sh' x='-30%25' y='-30%25' width='160%25' height='160%25'><feDropShadow dx='0' dy='1' stdDeviation='1.5' flood-color='rgba(92,67,3,0.55)'/></filter></defs><g filter='url(%23sh)'><circle cx='11' cy='23' r='3.2' fill='url(%23gb)' stroke='%235C4303' stroke-width='0.5'/><circle cx='21' cy='23' r='3.2' fill='url(%23gb)' stroke='%235C4303' stroke-width='0.5'/><path d='M16,10 L6,18 L10,21 L16,18 Z' fill='url(%23gd)' stroke='%235C4303' stroke-width='0.5'/><path d='M16,10 L26,18 L22,21 L16,18 Z' fill='url(%23gd)' stroke='%235C4303' stroke-width='0.5'/><path d='M16,2 L10,18 L16,22 Z' fill='url(%23gb)' stroke='%238A6405' stroke-width='0.5'/><path d='M16,2 L22,18 L16,22 Z' fill='url(%23gd)' stroke='%238A6405' stroke-width='0.5'/><path d='M16,14 L8,19 L16,23 Z' fill='url(%23gd)' opacity='0.85'/><path d='M16,14 L24,19 L16,23 Z' fill='url(%23gb)' opacity='0.85'/></g></svg>") 16 2, auto !important;
   }
 }
+
+/* Card Selection Styling for Rotaractors */
+.member-card.selected {
+  border-color: var(--primary) !important;
+  background: var(--primary-bg) !important;
+  box-shadow: 0 0 0 2px var(--primary-glow) !important;
+}
+
+.rotaractor-card-checkbox {
+  accent-color: var(--primary);
+}
