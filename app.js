@@ -631,30 +631,126 @@ async function saveMember() {
 // Sync / Add missing participants from Attendance Report to "Rotaractors" section
 async function syncMissingRotaractors(silent = false) {
   const reportNames = [
+    "RYANSTANISLAUS G IT B",
+    "KESHIKA T",
+    "SWAATHI SRI",
+    "SHIVANI STALIN",
+    "SRI BALAN",
+    "J.JAYARAJ",
+    "PRIYADHARSHINI R",
+    "ARUL KUMARAN",
+    "CAPTAIN ZONE",
+    "DAVANITHI K",
+    "NIKITHA",
+    "TAMIL ARASAN",
+    "PYNTHAMIZHPARRY AB",
+    "MITHRASHREE S",
+    "VENKAT PRABU G",
+    "BRINDA",
+    "GURU KARTHI",
+    "ISHANTH",
+    "PRATHIKVEL",
+    "PRADEEP.N",
+    "BHAVANA S",
+    "SPSUVETHA SPS",
     "SHARVESH L",
+    "TEJASHRI S. P",
+    "FELIX TONY",
+    "DHANUSHINIPANNEERSELVAM",
     "PRAVEENRAJ K",
+    "ENAMUL HASAN",
+    "GURU RDX",
     "SAIKUMAR S",
+    "TANUSREE RAVI",
+    "YOGESHWARAN NAGARAJ",
+    "RISHI KUMAR",
+    "MONIKA VIJAYKUMAR",
+    "MANISHA",
+    "NIKESH M",
+    "KARTHIKA DEVI",
+    "SILAS RAJ",
+    "JOICA VIJAI",
+    "ALSTON REUEL",
+    "HALAN PRAKASH",
+    "YUVASRI S",
+    "MONIKA S",
+    "MUKILAN M",
+    "PRIYADHARSHINI RAMESH",
+    "HISHUU",
+    "SRIRAM",
+    "SANDHIYA G",
+    "SADHANA CHANDRASEKARAN",
+    "MOHAMMED ZAID M",
+    "ILAKIYA JOTHI",
+    "BHUVAN SHANTHINI",
+    "ANBARASU ANBARASU",
+    "ISWARYA",
+    "ARUN 0080",
     "KUMARESAN KRISHNA",
     "SUBASRI S",
-    "YASIKA ",
+    "YASIKA !!",
+    "SECRETARY OF RAC PSVPEC",
+    "ELAVARASI SAMBATH",
     "SATHYA",
+    "YUNUS MD",
+    "AKCITTA E",
+    "PREMA RAGUPATHI",
+    "SERGEANT OF RAC PSVPEC",
+    "GOWRI ANBUKANNAN",
     "SHAHIN",
-    "MONISH ADHITHYA"
+    "PRIYADHARSHINI A",
+    "VARSHINI",
+    "SUBHIKSHA.S",
+    "MONISH ADHITHYA",
+    "SAI PRAKASH S",
+    "NITHYA SRI ARUNA",
+    "JOTHISRI",
+    "PRIYANGA",
+    "HARINI RAMAMOORTHI",
+    "JEEVANAA Y",
+    "VAIGUNTHAPRAJA V",
+    "ELAKKIA SRI",
+    "SHRIRAM K",
+    "SASIDHARA K",
+    "VENKAT PRABU"
   ];
 
   const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const existingNorms = new Set((APP.members || []).map(m => normalize(m.name)));
+
+  function levenshtein(a, b) {
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) matrix[i][j] = matrix[i - 1][j - 1];
+        else matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j] + 1);
+      }
+    }
+    return matrix[b.length][a.length];
+  }
+
+  function isApproxMatch(name1, name2) {
+    const n1 = normalize(name1);
+    const n2 = normalize(name2);
+    if (!n1 || !n2) return false;
+    if (n1 === n2) return true;
+    if (n1.length >= 5 && n2.length >= 5) {
+      if (n1.includes(n2) || n2.includes(n1)) return true;
+    }
+    const t1 = (name1 || '').toLowerCase().split(/[^a-z0-9]+/).filter(t => t.length >= 4);
+    const t2 = (name2 || '').toLowerCase().split(/[^a-z0-9]+/).filter(t => t.length >= 4);
+    if (t1.length > 0 && t2.length > 0) {
+      if (t1[0] === t2[0]) return true;
+      if (Math.abs(t1[0].length - t2[0].length) <= 2 && levenshtein(t1[0], t2[0]) <= 2) return true;
+    }
+    return false;
+  }
+
+  const existingNames = (APP.members || []).map(m => m.name).filter(Boolean);
 
   const missingNames = reportNames.filter(name => {
-    const norm = normalize(name);
-    if (!norm) return false;
-    return !Array.from(existingNorms).some(existNorm => {
-      if (existNorm === norm) return true;
-      if (norm.length > 5 && existNorm.length > 5) {
-        if (norm.includes(existNorm) || existNorm.includes(norm)) return true;
-      }
-      return false;
-    });
+    return !existingNames.some(existName => isApproxMatch(name, existName));
   });
 
   if (missingNames.length === 0) {
