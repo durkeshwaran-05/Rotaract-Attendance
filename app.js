@@ -652,6 +652,62 @@ function deleteMember(memberId) {
   );
 }
 
+// Helper to remove members that were auto-added in previous sync
+async function removeLastAddedRotaractors() {
+  const namesToRemove = [
+    "RYANSTANISLAUS G IT B", "KESHIKA T", "SWAATHI SRI", "SHIVANI STALIN", "SRI BALAN", "J.JAYARAJ",
+    "PRIYADHARSHINI R", "ARUL KUMARAN", "CAPTAIN ZONE", "DAVANITHI K", "NIKITHA", "TAMIL ARASAN",
+    "PYNTHAMIZHPARRY AB", "MITHRASHREE S", "VENKAT PRABU G", "BRINDA", "GURU KARTHI", "ISHANTH",
+    "PRATHIKVEL", "PRADEEP.N", "BHAVANA S", "SPSUVETHA SPS", "SHARVESH L", "TEJASHRI S. P",
+    "FELIX TONY", "DHANUSHINIPANNEERSELVAM", "PRAVEENRAJ K", "ENAMUL HASAN", "GURU RDX", "SAIKUMAR S",
+    "TANUSREE RAVI", "YOGESHWARAN NAGARAJ", "RISHI KUMAR", "MONIKA VIJAYKUMAR", "MANISHA", "NIKESH M",
+    "KARTHIKA DEVI", "SILAS RAJ", "JOICA VIJAI", "ALSTON REUEL", "HALAN PRAKASH", "YUVASRI S",
+    "MONIKA S", "MUKILAN M", "PRIYADHARSHINI RAMESH", "HISHUU", "SRIRAM", "SANDHIYA G",
+    "SADHANA CHANDRASEKARAN", "MOHAMMED ZAID M", "ILAKIYA JOTHI", "BHUVAN SHANTHINI", "ANBARASU ANBARASU",
+    "ISWARYA", "ARUN 0080", "KUMARESAN KRISHNA", "SUBASRI S", "YASIKA !!", "SECRETARY OF RAC PSVPEC",
+    "ELAVARASI SAMBATH", "SATHYA", "YUNUS MD", "AKCITTA E", "PREMA RAGUPATHI", "SERGEANT OF RAC PSVPEC",
+    "GOWRI ANBUKANNAN", "SHAHIN", "PRIYADHARSHINI A", "VARSHINI", "SUBHIKSHA.S", "MONISH ADHITHYA",
+    "SAI PRAKASH S", "NITHYA SRI ARUNA", "JOTHISRI", "PRIYANGA", "HARINI RAMAMOORTHI", "JEEVANAA Y",
+    "VAIGUNTHAPRAJA V", "ELAKKIA SRI", "SHRIRAM K", "SASIDHARA K", "VENKAT PRABU"
+  ];
+  const removeSet = new Set(namesToRemove.map(n => n.trim().toUpperCase()));
+  const matches = (APP.members || []).filter(m => m.category === 'Other Rotaractor' && removeSet.has((m.name || '').trim().toUpperCase()));
+
+  if (matches.length === 0) {
+    if (typeof showToast === 'function') showToast('No matching auto-added rotaractors found in database.', 'info');
+    return;
+  }
+
+  showConfirm(
+    `Remove ${matches.length} auto-added rotaractor(s)?`,
+    'This will delete the members added from the report from your database.',
+    async () => {
+      let deletedCount = 0;
+      try {
+        const batch = db.batch ? db.batch() : null;
+        for (const m of matches) {
+          const docRef = db.collection('members').doc(m.id);
+          if (batch) batch.delete(docRef);
+          else await docRef.delete();
+          deletedCount++;
+        }
+        if (batch) await batch.commit();
+        showToast(`Removed ${deletedCount} member(s) from database!`, 'success');
+        await fetchMembers();
+        renderMembersList();
+        renderAttendanceLists();
+        renderDashboard();
+        updateSettingsCounts();
+      } catch (err) {
+        console.error('Error removing members:', err);
+        showToast('Failed to remove members.', 'error');
+      }
+    },
+    'danger'
+  );
+}
+window.removeLastAddedRotaractors = removeLastAddedRotaractors;
+
 // ---- Render Members List ----
 function renderMembersList() {
   const searchQuery = ($('#member-search')?.value || '').toLowerCase();
