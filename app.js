@@ -847,7 +847,7 @@ async function deleteSelectedMembers(category) {
     return;
   }
 
-  const sectionDisplayName = category === 'Rotaractor' ? 'Green Rotaractor' : category;
+  const sectionDisplayName = category === 'Rotaractor' ? 'Green Rotaractor' : (category === 'Other Rotaractor' ? 'Rotaractor' : category);
 
   showConfirm(
     `Delete ${count} selected ${sectionDisplayName}(s)?`,
