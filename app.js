@@ -316,7 +316,6 @@ async function loadAppData() {
     if (APP.userRole && APP.userRole.accessMode === 'admin') {
       promises.push(fetchUserRoles().then(() => renderUserRoles()));
       promises.push(fetchDriveSettings().then(() => initGoogleClient()));
-      promises.push(syncMissingRotaractors(true));
     }
 
     await Promise.all(promises);
@@ -628,178 +627,6 @@ async function saveMember() {
   }
 }
 
-// Sync / Add missing participants from Attendance Report to "Rotaractors" section
-async function syncMissingRotaractors(silent = false) {
-  const reportNames = [
-    "RYANSTANISLAUS G IT B",
-    "KESHIKA T",
-    "SWAATHI SRI",
-    "SHIVANI STALIN",
-    "SRI BALAN",
-    "J.JAYARAJ",
-    "PRIYADHARSHINI R",
-    "ARUL KUMARAN",
-    "CAPTAIN ZONE",
-    "DAVANITHI K",
-    "NIKITHA",
-    "TAMIL ARASAN",
-    "PYNTHAMIZHPARRY AB",
-    "MITHRASHREE S",
-    "VENKAT PRABU G",
-    "BRINDA",
-    "GURU KARTHI",
-    "ISHANTH",
-    "PRATHIKVEL",
-    "PRADEEP.N",
-    "BHAVANA S",
-    "SPSUVETHA SPS",
-    "SHARVESH L",
-    "TEJASHRI S. P",
-    "FELIX TONY",
-    "DHANUSHINIPANNEERSELVAM",
-    "PRAVEENRAJ K",
-    "ENAMUL HASAN",
-    "GURU RDX",
-    "SAIKUMAR S",
-    "TANUSREE RAVI",
-    "YOGESHWARAN NAGARAJ",
-    "RISHI KUMAR",
-    "MONIKA VIJAYKUMAR",
-    "MANISHA",
-    "NIKESH M",
-    "KARTHIKA DEVI",
-    "SILAS RAJ",
-    "JOICA VIJAI",
-    "ALSTON REUEL",
-    "HALAN PRAKASH",
-    "YUVASRI S",
-    "MONIKA S",
-    "MUKILAN M",
-    "PRIYADHARSHINI RAMESH",
-    "HISHUU",
-    "SRIRAM",
-    "SANDHIYA G",
-    "SADHANA CHANDRASEKARAN",
-    "MOHAMMED ZAID M",
-    "ILAKIYA JOTHI",
-    "BHUVAN SHANTHINI",
-    "ANBARASU ANBARASU",
-    "ISWARYA",
-    "ARUN 0080",
-    "KUMARESAN KRISHNA",
-    "SUBASRI S",
-    "YASIKA !!",
-    "SECRETARY OF RAC PSVPEC",
-    "ELAVARASI SAMBATH",
-    "SATHYA",
-    "YUNUS MD",
-    "AKCITTA E",
-    "PREMA RAGUPATHI",
-    "SERGEANT OF RAC PSVPEC",
-    "GOWRI ANBUKANNAN",
-    "SHAHIN",
-    "PRIYADHARSHINI A",
-    "VARSHINI",
-    "SUBHIKSHA.S",
-    "MONISH ADHITHYA",
-    "SAI PRAKASH S",
-    "NITHYA SRI ARUNA",
-    "JOTHISRI",
-    "PRIYANGA",
-    "HARINI RAMAMOORTHI",
-    "JEEVANAA Y",
-    "VAIGUNTHAPRAJA V",
-    "ELAKKIA SRI",
-    "SHRIRAM K",
-    "SASIDHARA K",
-    "VENKAT PRABU"
-  ];
-
-  const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-
-  function levenshtein(a, b) {
-    const matrix = [];
-    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
-    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
-    for (let i = 1; i <= b.length; i++) {
-      for (let j = 1; j <= a.length; j++) {
-        if (b.charAt(i - 1) === a.charAt(j - 1)) matrix[i][j] = matrix[i - 1][j - 1];
-        else matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j] + 1);
-      }
-    }
-    return matrix[b.length][a.length];
-  }
-
-  function isApproxMatch(name1, name2) {
-    const n1 = normalize(name1);
-    const n2 = normalize(name2);
-    if (!n1 || !n2) return false;
-    if (n1 === n2) return true;
-    if (n1.length >= 5 && n2.length >= 5) {
-      if (n1.includes(n2) || n2.includes(n1)) return true;
-    }
-    const t1 = (name1 || '').toLowerCase().split(/[^a-z0-9]+/).filter(t => t.length >= 4);
-    const t2 = (name2 || '').toLowerCase().split(/[^a-z0-9]+/).filter(t => t.length >= 4);
-    if (t1.length > 0 && t2.length > 0) {
-      if (t1[0] === t2[0]) return true;
-      if (Math.abs(t1[0].length - t2[0].length) <= 2 && levenshtein(t1[0], t2[0]) <= 2) return true;
-    }
-    return false;
-  }
-
-  const existingNames = (APP.members || []).map(m => m.name).filter(Boolean);
-
-  const missingNames = reportNames.filter(name => {
-    return !existingNames.some(existName => isApproxMatch(name, existName));
-  });
-
-  if (missingNames.length === 0) {
-    if (!silent) showToast('All report names already exist in the database.', 'info');
-    return;
-  }
-
-  let addedCount = 0;
-
-  try {
-    const batch = db.batch ? db.batch() : null;
-    for (const name of missingNames) {
-      const docRef = db.collection('members').doc();
-      const memberData = {
-        name: name,
-        category: 'Other Rotaractor',
-        role: '',
-        department: '',
-        year: '',
-        phone: '',
-        email: '',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-      if (batch) {
-        batch.set(docRef, memberData);
-      } else {
-        await db.collection('members').add(memberData);
-      }
-      addedCount++;
-    }
-
-    if (batch) {
-      await batch.commit();
-    }
-
-    showToast(`Added ${addedCount} missing member(s) to Rotaractors section!`, 'success');
-    await fetchMembers();
-    renderMembersList();
-    renderAttendanceLists();
-    renderDashboard();
-    updateSettingsCounts();
-  } catch (err) {
-    console.error('Error syncing missing rotaractors:', err);
-    if (!silent) showToast('Failed to sync members. Please check admin permissions.', 'error');
-  }
-}
-
-
 function deleteMember(memberId) {
   const member = APP.members.find(m => m.id === memberId);
   if (!member) return;
@@ -824,6 +651,253 @@ function deleteMember(memberId) {
     'danger'
   );
 }
+
+
+
+// Helper to remove members that were auto-added in previous sync
+async function removeLastAddedRotaractors(silent = false) {
+  const namesToRemove = [
+    "RYANSTANISLAUS G IT B", "KESHIKA T", "SWAATHI SRI", "SHIVANI STALIN", "SRI BALAN", "J.JAYARAJ",
+    "PRIYADHARSHINI R", "ARUL KUMARAN", "CAPTAIN ZONE", "DAVANITHI K", "NIKITHA", "TAMIL ARASAN",
+    "PYNTHAMIZHPARRY AB", "MITHRASHREE S", "VENKAT PRABU G", "BRINDA", "GURU KARTHI", "ISHANTH",
+    "PRATHIKVEL", "PRADEEP.N", "BHAVANA S", "SPSUVETHA SPS", "SHARVESH L", "TEJASHRI S. P",
+    "FELIX TONY", "DHANUSHINIPANNEERSELVAM", "PRAVEENRAJ K", "ENAMUL HASAN", "GURU RDX", "SAIKUMAR S",
+    "TANUSREE RAVI", "YOGESHWARAN NAGARAJ", "RISHI KUMAR", "MONIKA VIJAYKUMAR", "MANISHA", "NIKESH M",
+    "KARTHIKA DEVI", "SILAS RAJ", "JOICA VIJAI", "ALSTON REUEL", "HALAN PRAKASH", "YUVASRI S",
+    "MONIKA S", "MUKILAN M", "PRIYADHARSHINI RAMESH", "HISHUU", "SRIRAM", "SANDHIYA G",
+    "SADHANA CHANDRASEKARAN", "MOHAMMED ZAID M", "ILAKIYA JOTHI", "BHUVAN SHANTHINI", "ANBARASU ANBARASU",
+    "ISWARYA", "ARUN 0080", "KUMARESAN KRISHNA", "SUBASRI S", "YASIKA !!", "YASIKA ", "SECRETARY OF RAC PSVPEC",
+    "ELAVARASI SAMBATH", "SATHYA", "YUNUS MD", "AKCITTA E", "PREMA RAGUPATHI", "SERGEANT OF RAC PSVPEC",
+    "GOWRI ANBUKANNAN", "SHAHIN", "PRIYADHARSHINI A", "VARSHINI", "SUBHIKSHA.S", "MONISH ADHITHYA",
+    "SAI PRAKASH S", "NITHYA SRI ARUNA", "JOTHISRI", "PRIYANGA", "HARINI RAMAMOORTHI", "JEEVANAA Y",
+    "VAIGUNTHAPRAJA V", "ELAKKIA SRI", "SHRIRAM K", "SASIDHARA K", "VENKAT PRABU"
+  ];
+  const removeSet = new Set(namesToRemove.map(n => n.trim().toUpperCase()));
+  const matches = (APP.members || []).filter(m => m.category === 'Other Rotaractor' && removeSet.has((m.name || '').trim().toUpperCase()));
+
+  if (matches.length === 0) {
+    if (!silent && typeof showToast === 'function') showToast('No added report rotaractors found in database.', 'info');
+    return;
+  }
+
+  const executeDelete = async () => {
+    let deletedCount = 0;
+    try {
+      const docsToDelete = [...matches];
+      while (docsToDelete.length > 0) {
+        const chunk = docsToDelete.splice(0, 400);
+        const batch = db.batch ? db.batch() : null;
+        for (const m of chunk) {
+          const docRef = db.collection('members').doc(m.id);
+          if (batch) batch.delete(docRef);
+          else await docRef.delete();
+          deletedCount++;
+        }
+        if (batch) await batch.commit();
+      }
+      if (typeof showToast === 'function') showToast(`Removed ${deletedCount} added rotaractor(s) from database!`, 'success');
+      await fetchMembers();
+      renderMembersList();
+      renderAttendanceLists();
+      renderDashboard();
+      updateSettingsCounts();
+    } catch (err) {
+      console.error('Error removing members:', err);
+      if (!silent && typeof showToast === 'function') showToast('Failed to remove members.', 'error');
+    }
+  };
+
+  if (silent) {
+    await executeDelete();
+  } else {
+    showConfirm(
+      `Remove ${matches.length} added rotaractor(s)?`,
+      'This will delete all newly added report names from the Rotaractors section in your database.',
+      executeDelete,
+      'danger'
+    );
+  }
+}
+window.removeLastAddedRotaractors = removeLastAddedRotaractors;
+
+// ============================================================
+// MEMBERS BULK SELECTION & DELETION (ALL CATEGORIES)
+// ============================================================
+const selectedMemberIds = new Set();
+const memberSelectionModes = {
+  'Board Official': false,
+  'Rotaractor': false,
+  'Other Rotaractor': false
+};
+
+const categoryPrefixes = {
+  'Board Official': 'board',
+  'Rotaractor': 'green',
+  'Other Rotaractor': 'rotaractor'
+};
+
+function toggleMemberSelectionMode(category, forceState) {
+  const prefix = categoryPrefixes[category];
+  if (!prefix) return;
+
+  const currentState = !!memberSelectionModes[category];
+  const nextState = (forceState !== undefined) ? forceState : !currentState;
+  memberSelectionModes[category] = nextState;
+
+  if (!nextState) {
+    const categoryMembers = APP.members.filter(m => m.category === category);
+    categoryMembers.forEach(m => selectedMemberIds.delete(m.id));
+  }
+
+  const selectBtn = $(`#toggle-${prefix}-select-mode-btn`);
+  const controlsWrapper = $(`#${prefix}-select-controls`);
+
+  if (selectBtn) {
+    selectBtn.classList.toggle('btn-primary', nextState);
+    selectBtn.classList.toggle('btn-outline', !nextState);
+    selectBtn.innerHTML = nextState
+      ? '<i class="fas fa-check-square"></i> Selecting...'
+      : '<i class="fas fa-tasks"></i> Select';
+  }
+
+  if (controlsWrapper) {
+    if (nextState) controlsWrapper.classList.remove('hidden');
+    else controlsWrapper.classList.add('hidden');
+  }
+
+  updateMemberSelectionUI(category);
+  renderMembersList();
+}
+
+function toggleSelectAllMembers(category, checked) {
+  const categoryMembers = APP.members.filter(m => m.category === category);
+  const searchQuery = ($('#member-search')?.value || '').toLowerCase();
+  let targetMembers = categoryMembers;
+  if (searchQuery) {
+    targetMembers = targetMembers.filter(m =>
+      (m.name || '').toLowerCase().includes(searchQuery) ||
+      (m.role || '').toLowerCase().includes(searchQuery) ||
+      (m.department || '').toLowerCase().includes(searchQuery) ||
+      (m.email || '').toLowerCase().includes(searchQuery)
+    );
+  }
+
+  if (checked) {
+    targetMembers.forEach(m => selectedMemberIds.add(m.id));
+  } else {
+    targetMembers.forEach(m => selectedMemberIds.delete(m.id));
+  }
+
+  updateMemberSelectionUI(category);
+  renderMembersList();
+}
+
+function handleMemberCheckboxChange(checkbox, category) {
+  const id = checkbox.dataset.id;
+  if (checkbox.checked) {
+    selectedMemberIds.add(id);
+  } else {
+    selectedMemberIds.delete(id);
+  }
+  updateMemberSelectionUI(category);
+
+  const card = checkbox.closest('.member-card');
+  if (card) {
+    card.classList.toggle('selected', checkbox.checked);
+  }
+}
+
+function updateMemberSelectionUI(category) {
+  const prefix = categoryPrefixes[category];
+  if (!prefix) return;
+
+  const countEl = $(`#selected-${prefix}-count`);
+  const deleteBtn = $(`#delete-selected-${prefix}-btn`);
+  const selectAllCb = $(`#select-all-${prefix}-checkbox`);
+
+  const categoryMembers = APP.members.filter(m => m.category === category);
+  const selectedCategoryCount = categoryMembers.filter(m => selectedMemberIds.has(m.id)).length;
+
+  if (countEl) countEl.textContent = selectedCategoryCount;
+
+  if (deleteBtn) {
+    if (selectedCategoryCount > 0 && memberSelectionModes[category]) {
+      deleteBtn.classList.remove('hidden');
+    } else {
+      deleteBtn.classList.add('hidden');
+    }
+  }
+
+  if (selectAllCb) {
+    if (categoryMembers.length > 0 && selectedCategoryCount >= categoryMembers.length) {
+      selectAllCb.checked = true;
+    } else if (selectedCategoryCount === 0) {
+      selectAllCb.checked = false;
+    }
+  }
+}
+
+async function deleteSelectedMembers(category) {
+  const categoryMembers = APP.members.filter(m => m.category === category);
+  const idsToDelete = categoryMembers.filter(m => selectedMemberIds.has(m.id)).map(m => m.id);
+  const count = idsToDelete.length;
+
+  if (count === 0) {
+    showToast(`No members selected for deletion.`, 'warning');
+    return;
+  }
+
+  const sectionDisplayName = category === 'Rotaractor' ? 'Green Rotaractor' : category;
+
+  showConfirm(
+    `Delete ${count} selected ${sectionDisplayName}(s)?`,
+    `Are you sure you want to delete ${count} ${sectionDisplayName}(s) from the database? This action cannot be undone.`,
+    async () => {
+      try {
+        let deletedCount = 0;
+
+        while (idsToDelete.length > 0) {
+          const chunk = idsToDelete.splice(0, 400);
+          const batch = db.batch ? db.batch() : null;
+
+          for (const id of chunk) {
+            const docRef = db.collection('members').doc(id);
+            if (batch) batch.delete(docRef);
+            else await docRef.delete();
+            selectedMemberIds.delete(id);
+            deletedCount++;
+          }
+
+          if (batch) await batch.commit();
+        }
+
+        toggleMemberSelectionMode(category, false);
+        showToast(`Successfully deleted ${deletedCount} ${sectionDisplayName}(s).`, 'success');
+
+        await fetchMembers();
+        renderMembersList();
+        renderAttendanceLists();
+        renderDashboard();
+        updateSettingsCounts();
+      } catch (err) {
+        console.error('Error deleting selected members:', err);
+        showToast('Failed to delete selected members.', 'error');
+      }
+    },
+    'danger'
+  );
+}
+
+// Backwards compatibility aliases
+window.toggleRotaractorSelectionMode = (state) => toggleMemberSelectionMode('Other Rotaractor', state);
+window.toggleSelectAllRotaractors = (checked) => toggleSelectAllMembers('Other Rotaractor', checked);
+window.handleRotaractorCheckboxChange = (cb) => handleMemberCheckboxChange(cb, 'Other Rotaractor');
+window.deleteSelectedRotaractors = () => deleteSelectedMembers('Other Rotaractor');
+
+window.toggleMemberSelectionMode = toggleMemberSelectionMode;
+window.toggleSelectAllMembers = toggleSelectAllMembers;
+window.handleMemberCheckboxChange = handleMemberCheckboxChange;
+window.deleteSelectedMembers = deleteSelectedMembers;
 
 // ---- Render Members List ----
 function renderMembersList() {
@@ -866,15 +940,27 @@ function renderMembersList() {
       return;
     }
 
+    // Map display categoryName to DB category key
+    const dbCategoryKey = categoryName === 'Board Official' ? 'Board Official'
+      : categoryName === 'Green Rotaractor' ? 'Rotaractor' : 'Other Rotaractor';
+
+    const isSelectionMode = !!memberSelectionModes[dbCategoryKey];
+
     container.innerHTML = members.map(m => {
       const avatarClass = m.category === 'Board Official' ? 'board'
         : m.category === 'Rotaractor' ? 'rotaractor' : 'other';
       const badgeClass = m.category === 'Board Official' ? 'badge-board'
         : m.category === 'Rotaractor' ? 'badge-rotaractor' : 'badge-other';
       const initials = (m.name || 'U').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+      const isSelected = selectedMemberIds.has(m.id);
 
       return `
-        <div class="member-card">
+        <div class="member-card ${isSelected ? 'selected' : ''}" style="position:relative;">
+          ${isSelectionMode ? `
+            <div style="position:absolute; top:12px; right:12px; z-index:5;">
+              <input type="checkbox" class="rotaractor-card-checkbox" data-id="${m.id}" ${isSelected ? 'checked' : ''} onchange="handleMemberCheckboxChange(this, '${m.category}')" title="Select Member" style="width:18px; height:18px; cursor:pointer; accent-color:var(--primary);">
+            </div>
+          ` : ''}
           <div class="member-avatar ${avatarClass}">${initials}</div>
           <div class="member-info">
             <div class="member-name">${escapeHtml(m.name)}</div>

@@ -438,6 +438,21 @@
               <span class="member-count-badge" id="members-board-count">0</span>
             </h2>
             <div class="category-section-actions">
+              <button class="btn btn-sm btn-outline" id="toggle-board-select-mode-btn" onclick="toggleMemberSelectionMode('Board Official')">
+                <i class="fas fa-tasks"></i> Select
+              </button>
+              <div id="board-select-controls" class="hidden" style="display:inline-flex; align-items:center; gap:6px;">
+                <label class="btn btn-sm btn-outline" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                  <input type="checkbox" id="select-all-board-checkbox" onchange="toggleSelectAllMembers('Board Official', this.checked)" style="cursor:pointer;">
+                  <span>Select All</span>
+                </label>
+                <button class="btn btn-sm btn-danger admin-only hidden" id="delete-selected-board-btn" onclick="deleteSelectedMembers('Board Official')">
+                  <i class="fas fa-trash-alt"></i> Delete Selected (<span id="selected-board-count">0</span>)
+                </button>
+                <button class="btn btn-sm btn-ghost" onclick="toggleMemberSelectionMode('Board Official', false)">
+                  <i class="fas fa-times"></i> Cancel
+                </button>
+              </div>
               <button class="btn btn-sm btn-accent" onclick="openAddMemberModal('Board Official')"><i class="fas fa-plus"></i> Add Member</button>
               <button class="btn btn-sm btn-outline admin-only" onclick="triggerImportExcel('Board Official')"><i class="fas fa-file-import"></i> Import Excel</button>
               <button class="btn btn-sm btn-ghost admin-only" onclick="downloadTemplate('Board Official')"><i class="fas fa-file-download"></i> Download Template</button>
@@ -455,6 +470,21 @@
               <span class="member-count-badge" id="members-rotaractor-count">0</span>
             </h2>
             <div class="category-section-actions">
+              <button class="btn btn-sm btn-outline" id="toggle-green-select-mode-btn" onclick="toggleMemberSelectionMode('Rotaractor')">
+                <i class="fas fa-tasks"></i> Select
+              </button>
+              <div id="green-select-controls" class="hidden" style="display:inline-flex; align-items:center; gap:6px;">
+                <label class="btn btn-sm btn-outline" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                  <input type="checkbox" id="select-all-green-checkbox" onchange="toggleSelectAllMembers('Rotaractor', this.checked)" style="cursor:pointer;">
+                  <span>Select All</span>
+                </label>
+                <button class="btn btn-sm btn-danger admin-only hidden" id="delete-selected-green-btn" onclick="deleteSelectedMembers('Rotaractor')">
+                  <i class="fas fa-trash-alt"></i> Delete Selected (<span id="selected-green-count">0</span>)
+                </button>
+                <button class="btn btn-sm btn-ghost" onclick="toggleMemberSelectionMode('Rotaractor', false)">
+                  <i class="fas fa-times"></i> Cancel
+                </button>
+              </div>
               <button class="btn btn-sm btn-accent" onclick="openAddMemberModal('Rotaractor')"><i class="fas fa-plus"></i> Add Member</button>
               <button class="btn btn-sm btn-outline admin-only" onclick="triggerImportExcel('Rotaractor')"><i class="fas fa-file-import"></i> Import Excel</button>
               <button class="btn btn-sm btn-ghost admin-only" onclick="downloadTemplate('Rotaractor')"><i class="fas fa-file-download"></i> Download Template</button>
@@ -472,8 +502,22 @@
               <span class="member-count-badge" id="members-other-count">0</span>
             </h2>
             <div class="category-section-actions">
+              <button class="btn btn-sm btn-outline" id="toggle-rotaractor-select-mode-btn" onclick="toggleMemberSelectionMode('Other Rotaractor')">
+                <i class="fas fa-tasks"></i> Select
+              </button>
+              <div id="rotaractor-select-controls" class="hidden" style="display:inline-flex; align-items:center; gap:6px;">
+                <label class="btn btn-sm btn-outline" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                  <input type="checkbox" id="select-all-rotaractor-checkbox" onchange="toggleSelectAllMembers('Other Rotaractor', this.checked)" style="cursor:pointer;">
+                  <span>Select All</span>
+                </label>
+                <button class="btn btn-sm btn-danger admin-only hidden" id="delete-selected-rotaractor-btn" onclick="deleteSelectedMembers('Other Rotaractor')">
+                  <i class="fas fa-trash-alt"></i> Delete Selected (<span id="selected-rotaractor-count">0</span>)
+                </button>
+                <button class="btn btn-sm btn-ghost" onclick="toggleMemberSelectionMode('Other Rotaractor', false)">
+                  <i class="fas fa-times"></i> Cancel
+                </button>
+              </div>
               <button class="btn btn-sm btn-accent" onclick="openAddMemberModal('Other Rotaractor')"><i class="fas fa-plus"></i> Add Member</button>
-              <button class="btn btn-sm btn-outline admin-only" onclick="syncMissingRotaractors()"><i class="fas fa-user-plus"></i> Sync Report Rotaractors</button>
             </div>
           </div>
           <div class="members-grid" id="other-rotaractors-grid"></div>
